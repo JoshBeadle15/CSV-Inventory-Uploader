@@ -13,7 +13,7 @@
     "react-dom": "^19.2.0",
     "@google/genai": "^1.27.0",
     "papaparse": "^5.4.1",
-    "xlsx": "^0.18.5"
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
