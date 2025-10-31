@@ -22,10 +22,22 @@ export const config = {
     apiVersion: process.env.SHOPIFY_API_VERSION || '2024-07',
   },
 
-  // OpenAI Configuration
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY,
-    model: process.env.OPENAI_MODEL || 'gpt-4o',
+  // AI Provider Configuration
+  ai: {
+    // Provider selection: 'openai' or 'gemini'
+    provider: process.env.AI_PROVIDER || 'openai',
+
+    // OpenAI Configuration
+    openai: {
+      apiKey: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_MODEL || 'gpt-4o',
+    },
+
+    // Google Gemini Configuration
+    gemini: {
+      apiKey: process.env.GEMINI_API_KEY,
+      model: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
+    },
   },
 
   // Sync Configuration
@@ -96,8 +108,16 @@ export function validateConfig() {
     { key: 'AIMSII_API_URL', value: config.aimsii.apiUrl },
     { key: 'SHOPIFY_STORE', value: config.shopify.store },
     { key: 'SHOPIFY_ACCESS_TOKEN', value: config.shopify.accessToken },
-    { key: 'OPENAI_API_KEY', value: config.openai.apiKey },
   ];
+
+  // Validate the appropriate AI provider API key
+  if (config.ai.provider === 'openai') {
+    required.push({ key: 'OPENAI_API_KEY', value: config.ai.openai.apiKey });
+  } else if (config.ai.provider === 'gemini') {
+    required.push({ key: 'GEMINI_API_KEY', value: config.ai.gemini.apiKey });
+  } else {
+    throw new Error(`Invalid AI_PROVIDER: ${config.ai.provider}. Must be 'openai' or 'gemini'`);
+  }
 
   const missing = required.filter(({ value }) => !value);
 

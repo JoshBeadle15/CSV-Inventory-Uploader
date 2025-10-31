@@ -109,12 +109,55 @@ Contact your AIMSii administrator or Tritech support to obtain:
    - `write_products`
 5. Install the app and copy the **Admin API access token**
 
-### OpenAI API
+### AI Provider: OpenAI or Google Gemini
 
+This application uses AI to intelligently transform product data. You can choose between two providers:
+
+#### Option 1: OpenAI (GPT-4o)
+
+**Pros:**
+- Excellent quality and reliability
+- Consistent structured output
+- Well-tested
+
+**Cons:**
+- More expensive (~$2.50-10 per 1M tokens)
+- Requires paid API access
+
+**Setup:**
 1. Go to [platform.openai.com](https://platform.openai.com)
 2. Navigate to **API Keys**
 3. Create a new API key
 4. Ensure you have GPT-4o access
+5. Set `AI_PROVIDER=openai` in `.env`
+6. Add your `OPENAI_API_KEY`
+
+#### Option 2: Google Gemini (Recommended for Cost Savings)
+
+**Pros:**
+- **Much cheaper** (10-20x less than OpenAI)
+- **Free tier available** (up to 15 requests/minute)
+- High quality with Gemini 1.5 Pro
+- Faster with Gemini 1.5 Flash
+
+**Cons:**
+- Slightly less predictable than OpenAI
+- Newer API
+
+**Setup:**
+1. Go to [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+2. Click **Create API Key**
+3. Copy the key
+4. Set `AI_PROVIDER=gemini` in `.env`
+5. Add your `GEMINI_API_KEY`
+6. Choose model: `gemini-1.5-pro` (better quality) or `gemini-1.5-flash` (faster/cheaper)
+
+**Cost Comparison (per 1M tokens):**
+- OpenAI GPT-4o: ~$2.50 input / $10 output
+- Gemini 1.5 Pro: ~$0.125 input / $0.375 output (20x cheaper)
+- Gemini 1.5 Flash: ~$0.075 input / $0.30 output (30x cheaper)
+
+**Recommendation:** Start with Gemini's free tier. If you need more predictability or hit rate limits, switch to OpenAI.
 
 ## Running Locally
 
@@ -170,7 +213,18 @@ AIMSII_API_URL=...
 AIMSII_API_KEY=...
 SHOPIFY_STORE=...
 SHOPIFY_ACCESS_TOKEN=...
+AI_PROVIDER=openai  # or 'gemini'
+```
+
+**AI Provider Keys (choose one based on AI_PROVIDER):**
+```
+# If AI_PROVIDER=openai
 OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4o
+
+# If AI_PROVIDER=gemini
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-1.5-pro
 ```
 
 **Optional (with defaults):**
@@ -262,7 +316,8 @@ Ensure all required variables are set in `.env`:
 - `AIMSII_API_URL`
 - `SHOPIFY_STORE`
 - `SHOPIFY_ACCESS_TOKEN`
-- `OPENAI_API_KEY`
+- `AI_PROVIDER` (set to 'openai' or 'gemini')
+- Either `OPENAI_API_KEY` or `GEMINI_API_KEY` (depending on AI_PROVIDER)
 
 ### "Failed to connect to AIMSii API"
 
@@ -274,12 +329,24 @@ Ensure all required variables are set in `.env`:
 
 This is normal. The script checks for existing SKUs before creating to avoid duplicates.
 
-### OpenAI Rate Limits
+### AI Provider Rate Limits
 
-If you hit OpenAI rate limits:
-- Reduce `CHECK_INTERVAL_HOURS` to spread out requests
+**If using OpenAI and hitting rate limits:**
+- Switch to Gemini: Set `AI_PROVIDER=gemini` in `.env`
 - Upgrade your OpenAI plan
+- Reduce `CHECK_INTERVAL_HOURS` to spread out requests
+
+**If using Gemini and hitting rate limits:**
+- Free tier: 15 requests/minute
+- Switch to OpenAI if you need higher throughput
 - Add delays between products in `index.js`
+
+### Switching AI Providers
+
+To switch between OpenAI and Gemini:
+1. Update `AI_PROVIDER` in `.env` (change to 'openai' or 'gemini')
+2. Ensure the corresponding API key is set
+3. Restart the application with `npm start`
 
 ## Development
 

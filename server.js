@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Load environment variables from .env (server-side only)
 dotenv.config();
@@ -17,10 +18,22 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Initialize OpenAI with API key from server environment
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// AI Provider configuration
+const AI_PROVIDER = process.env.AI_PROVIDER || 'openai'; // 'openai' or 'gemini'
+
+// Initialize OpenAI (if selected)
+let openai;
+if (AI_PROVIDER === 'openai') {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
+
+// Initialize Google Gemini (if selected)
+let gemini;
+if (AI_PROVIDER === 'gemini') {
+  gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+}
 
 // JSON Schema for Shopify product format
 const shopifyProductSchema = {
@@ -66,6 +79,77 @@ const shopifyProductSchema = {
   required: ["product"]
 };
 
+/**
+ * Generate product JSON using OpenAI
+ */
+async function generateWithOpenAI(sourceDataDescription, mappingDescription, systemPrompt, userPrompt) {
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+
+  const response = await openai.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content: userPrompt
+      }
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "ShopifyProduct",
+        schema: shopifyProductSchema,
+        strict: true
+      }
+    },
+    temperature: 0.2
+  });
+
+  const jsonText = response.choices[0]?.message?.content?.trim();
+
+  if (!jsonText) {
+    throw new Error('Received an empty response from OpenAI');
+  }
+
+  return jsonText;
+}
+
+/**
+ * Generate product JSON using Google Gemini
+ */
+async function generateWithGemini(sourceDataDescription, mappingDescription, systemPrompt, userPrompt) {
+  const model = gemini.getGenerativeModel({
+    model: process.env.GEMINI_MODEL || 'gemini-1.5-pro',
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.2,
+    }
+  });
+
+  const fullPrompt = `${systemPrompt}
+
+${userPrompt}
+
+IMPORTANT: You must respond with valid JSON matching this exact schema:
+${JSON.stringify(shopifyProductSchema, null, 2)}`;
+
+  const result = await model.generateContent(fullPrompt);
+  const response = result.response;
+  const jsonText = response.text().trim();
+
+  if (!jsonText) {
+    throw new Error('Received an empty response from Gemini');
+  }
+
+  // Validate it's valid JSON
+  JSON.parse(jsonText);
+
+  return jsonText;
+}
+
 // API endpoint for generating Shopify product JSON
 app.post('/api/generate-shopify-product', async (req, res) => {
   try {
@@ -85,7 +169,7 @@ app.post('/api/generate-shopify-product', async (req, res) => {
       .map(([shopifyHeader, aimsiiHeader]) => `- Shopify '${shopifyHeader}' should use the value from source field '${aimsiiHeader}'.`)
       .join('\n');
 
-    const systemPrompt = `You are a data transformation expert specializing in converting product data into Shopify-compatible JSON format. 
+    const systemPrompt = `You are a data transformation expert specializing in converting product data into Shopify-compatible JSON format.
 Your task is to take source product data and mapping rules, then generate a valid JSON object that adheres to the Shopify Product API schema.
 Always ensure all required fields are populated. If a value is missing, provide a reasonable default.`;
 
@@ -108,39 +192,20 @@ Instructions for generation:
 
 Generate ONLY valid JSON output that matches the required schema.`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: userPrompt
-        }
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "ShopifyProduct",
-          schema: shopifyProductSchema,
-          strict: true
-        }
-      },
-      temperature: 0.2
-    });
-
-    const jsonText = response.choices[0]?.message?.content?.trim();
-
-    if (!jsonText) {
-      return res.status(500).json({ error: 'Received an empty response from OpenAI' });
+    // Generate using the selected AI provider
+    let jsonText;
+    if (AI_PROVIDER === 'openai') {
+      jsonText = await generateWithOpenAI(sourceDataDescription, mappingDescription, systemPrompt, userPrompt);
+    } else if (AI_PROVIDER === 'gemini') {
+      jsonText = await generateWithGemini(sourceDataDescription, mappingDescription, systemPrompt, userPrompt);
+    } else {
+      return res.status(500).json({ error: `Unknown AI provider: ${AI_PROVIDER}` });
     }
 
     res.json({ success: true, data: jsonText });
   } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    res.status(500).json({ 
+    console.error(`Error calling ${AI_PROVIDER.toUpperCase()} API:`, error);
+    res.status(500).json({
       error: error instanceof Error ? error.message : 'An unknown error occurred'
     });
   }
@@ -154,7 +219,13 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Backend server running on http://localhost:${PORT}`);
   console.log(`API endpoint: http://localhost:${PORT}/api/generate-shopify-product`);
-  if (!process.env.OPENAI_API_KEY) {
+  console.log(`🤖 AI Provider: ${AI_PROVIDER.toUpperCase()}`);
+
+  // Validate API keys based on provider
+  if (AI_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
     console.warn('⚠️  WARNING: OPENAI_API_KEY environment variable is not set!');
+  }
+  if (AI_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
+    console.warn('⚠️  WARNING: GEMINI_API_KEY environment variable is not set!');
   }
 });
