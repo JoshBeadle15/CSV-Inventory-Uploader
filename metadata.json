@@ -1,5 +1,0 @@
-{
-  "name": "AIMSii CSV to Shopify Uploader",
-  "description": "An application to bulk-create Shopify product listings by uploading a CSV file with AIMSii inventory data. It parses the CSV, uses the Gemini API to generate Shopify-compatible JSON for each product, and simulates creating drafts via the Shopify API.",
-  "requestFramePermissions": []
-}

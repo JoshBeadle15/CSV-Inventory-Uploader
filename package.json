@@ -1,24 +1,31 @@
 {
   "name": "aimsii-csv-to-shopify-uploader",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Automated sync script that monitors Tritech AIMSii inventory and creates product drafts in Shopify",
+  "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "concurrently \"node server.js\" \"node index.js\"",
+    "dev": "concurrently \"node server.js\" \"NODE_ENV=development node index.js\"",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "sync": "concurrently \"node server.js\" \"node index.js\"",
+    "sync:once": "concurrently \"node server.js\" \"RUN_ONCE=true node index.js\"",
+    "sync:dry-run": "concurrently \"node server.js\" \"DRY_RUN=true RUN_ONCE=true node index.js\"",
+    "server": "node server.js"
   },
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "@google/genai": "^1.27.0",
-    "papaparse": "^5.4.1",
-    "exceljs": "^4.4.0"
+    "openai": "^4.71.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "concurrently": "^8.2.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "typescript": "~5.8.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
