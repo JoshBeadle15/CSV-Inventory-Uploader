@@ -36,6 +36,7 @@ if (AI_PROVIDER === 'gemini') {
 }
 
 // JSON Schema for Shopify product format
+// NOTE: Images are NOT included - they will be added manually later
 const shopifyProductSchema = {
   type: "object",
   properties: {
@@ -47,6 +48,7 @@ const shopifyProductSchema = {
         vendor: { type: "string", description: "Product vendor/manufacturer" },
         product_type: { type: "string", description: "Product type/category" },
         tags: { type: "string", description: "Comma-separated tags" },
+        published: { type: "boolean", description: "Whether product is published (always false for drafts)" },
         variants: {
           type: "array",
           items: {
@@ -55,25 +57,15 @@ const shopifyProductSchema = {
               price: { type: "string", description: "Price as string" },
               sku: { type: "string", description: "Stock keeping unit" },
               inventory_quantity: { type: "integer", description: "Inventory count" },
+              barcode: { type: "string", description: "Product barcode" },
               option1: { type: "string", description: "Variant option (e.g., 'Default Title')" }
             },
             required: ["price", "sku", "inventory_quantity", "option1"]
           },
           description: "Product variants"
-        },
-        images: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              src: { type: "string", description: "Image URL" }
-            },
-            required: ["src"]
-          },
-          description: "Product images"
         }
       },
-      required: ["title", "body_html", "vendor", "product_type", "tags", "variants", "images"]
+      required: ["title", "body_html", "vendor", "product_type", "tags", "published", "variants"]
     }
   },
   required: ["product"]
@@ -171,7 +163,10 @@ app.post('/api/generate-shopify-product', async (req, res) => {
 
     const systemPrompt = `You are a data transformation expert specializing in converting product data into Shopify-compatible JSON format.
 Your task is to take source product data and mapping rules, then generate a valid JSON object that adheres to the Shopify Product API schema.
-Always ensure all required fields are populated. If a value is missing, provide a reasonable default.`;
+Always ensure all required fields are populated. If a value is missing, provide a reasonable default.
+
+CRITICAL: DO NOT include an images array or image URLs. Images will be added manually later.
+CRITICAL: ALWAYS set published: false (products must be created as drafts).`;
 
     const userPrompt = `
 Given the following single product data from a source CSV, please create a product listing in JSON format that is compatible with the Shopify Product API.
@@ -184,11 +179,13 @@ ${mappingDescription}
 
 Instructions for generation:
 1. Use the mapped fields to construct the JSON. For example, if Shopify 'title' is mapped to source 'product_name', use the value of 'product_name' for the 'title' field in the JSON.
-2. The 'body_html' should be well-formatted HTML.
-3. The 'tags' should be a comma-separated string.
+2. The 'body_html' should be well-formatted HTML with professional product description.
+3. The 'tags' should be a comma-separated string for searchability.
 4. The variant's 'price' must be a string.
 5. The variant's 'option1' should be "Default Title".
-6. Create a single variant and a single image object.
+6. Set 'published' to false (product will be a draft).
+7. DO NOT include an 'images' field or array - images will be added manually later.
+8. Include barcode in variant if available in source data.
 
 Generate ONLY valid JSON output that matches the required schema.`;
 

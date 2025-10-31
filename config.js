@@ -86,6 +86,24 @@ export const config = {
     'images.src': process.env.AIMSII_FIELD_IMAGE || 'imageUrl',
   },
 
+  // AI Learning Configuration
+  aiLearning: {
+    // Enable AI field mapping auto-discovery
+    enableFieldMapping: process.env.AI_ENABLE_FIELD_MAPPING !== 'false', // default true
+
+    // Enable transformation caching for cost reduction
+    enableTransformCache: process.env.AI_ENABLE_TRANSFORM_CACHE !== 'false', // default true
+
+    // Number of sample products to analyze for field mapping
+    mappingSampleSize: parseInt(process.env.AI_MAPPING_SAMPLE_SIZE || '5', 10),
+
+    // Similarity threshold for using cached templates (0.0 - 1.0)
+    cacheSimilarityThreshold: parseFloat(process.env.AI_CACHE_SIMILARITY || '0.7'),
+
+    // Maximum examples to keep per template
+    maxExamplesPerTemplate: parseInt(process.env.AI_MAX_EXAMPLES_PER_TEMPLATE || '5', 10),
+  },
+
   // Additional Settings
   settings: {
     // Whether to create products as drafts (true) or published (false)

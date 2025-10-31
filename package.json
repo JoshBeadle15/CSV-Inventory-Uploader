@@ -6,21 +6,24 @@
   "description": "Automated sync script that monitors Tritech AIMSii inventory and creates product drafts in Shopify",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently \"node server.js\" \"node index.js\"",
-    "dev": "concurrently \"node server.js\" \"NODE_ENV=development node index.js\"",
+    "start": "concurrently \"node server.js\" \"node index-ai-enhanced.js\"",
+    "start:old": "concurrently \"node server.js\" \"node index.js\"",
+    "dev": "concurrently \"node server.js\" \"NODE_ENV=development node index-ai-enhanced.js\"",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "sync": "concurrently \"node server.js\" \"node index.js\"",
-    "sync:once": "concurrently \"node server.js\" \"RUN_ONCE=true node index.js\"",
-    "sync:dry-run": "concurrently \"node server.js\" \"DRY_RUN=true RUN_ONCE=true node index.js\"",
+    "test:ai": "node scripts/testAILearning.js",
+    "sync": "concurrently \"node server.js\" \"node index-ai-enhanced.js\"",
+    "sync:once": "concurrently \"node server.js\" \"RUN_ONCE=true node index-ai-enhanced.js\"",
+    "sync:dry-run": "concurrently \"node server.js\" \"DRY_RUN=true RUN_ONCE=true node index-ai-enhanced.js\"",
     "server": "node server.js"
   },
   "dependencies": {
-    "openai": "^4.71.0",
     "@google/generative-ai": "^0.21.0",
-    "express": "^4.18.2",
+    "concurrently": "^8.2.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "concurrently": "^8.2.2"
+    "exceljs": "^4.4.0",
+    "express": "^4.18.2",
+    "openai": "^4.71.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
