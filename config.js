@@ -9,9 +9,12 @@ dotenv.config();
 export const config = {
   // AIMSii API Configuration
   aimsii: {
-    apiUrl: process.env.AIMSII_API_URL || 'https://api.aimsii.com',
+    // Base URL for initial authentication (GetEndpoint call)
+    baseUrl: process.env.AIMSII_BASE_URL || 'https://active-ewebservice.biz/aeservices30/api',
     apiKey: process.env.AIMSII_API_KEY,
-    // Endpoint to fetch inventory records
+    username: process.env.AIMSII_USERNAME,
+    password: process.env.AIMSII_PASSWORD,
+    // Endpoint to fetch inventory records (appended to authenticated domain)
     inventoryEndpoint: process.env.AIMSII_INVENTORY_ENDPOINT || '/api/inventory',
   },
 
@@ -57,6 +60,54 @@ export const config = {
 
     // Whether to filter by categories (if false, syncs all categories)
     filterByCategory: process.env.FILTER_BY_CATEGORY === 'true',
+
+    // Batch size: Number of products to process per run (default: 10)
+    batchSize: parseInt(process.env.BATCH_SIZE || '10', 10),
+
+    // Focus categories: Override allowedCategories for current run
+    // Example: "Electronics,Cables" - targets only these categories
+    focusCategories: process.env.FOCUS_CATEGORIES
+      ? process.env.FOCUS_CATEGORIES.split(',').map(c => c.trim())
+      : null,
+  },
+
+  // Multi-Location Inventory Configuration
+  inventory: {
+    // Enable multi-location inventory updates (default: false)
+    enableLocationUpdates: process.env.ENABLE_LOCATION_UPDATES === 'true',
+
+    // Specific Shopify location names or IDs (comma-separated)
+    // Leave empty to use all locations
+    // Example: "Warehouse,Storefront" or "gid://shopify/Location/123,gid://shopify/Location/456"
+    locations: process.env.SHOPIFY_LOCATIONS
+      ? process.env.SHOPIFY_LOCATIONS.split(',').map(l => l.trim())
+      : [],
+
+    // AIMSii Location ID to Name Mapping
+    // Maps numeric location IDs from AIMSii to friendly location names
+    // Format: "id:name,id:name" (e.g., "1:Bozeman,2:Billings")
+    // This is used to detect and translate location-specific quantity fields
+    locationIdMapping: process.env.AIMSII_LOCATION_MAPPING
+      ? Object.fromEntries(
+          process.env.AIMSII_LOCATION_MAPPING.split(',').map(pair => {
+            const [id, name] = pair.trim().split(':');
+            return [id.trim(), name.trim()];
+          })
+        )
+      : { '1': 'Bozeman', '2': 'Billings' }, // Default mapping
+
+    // Field name pattern for location quantities in AIMSii data
+    // Patterns to detect location-specific quantity fields
+    // Examples: "qty_{id}", "location_{id}_qty", "{id}_quantity"
+    locationQuantityPatterns: process.env.AIMSII_LOCATION_QTY_PATTERNS
+      ? process.env.AIMSII_LOCATION_QTY_PATTERNS.split(',').map(p => p.trim())
+      : ['qty_{id}', 'location_{id}_qty', 'quantity_{id}', '{id}_qty'],
+
+    // Update inventory for existing products (default: true if location updates enabled)
+    updateExistingProducts: process.env.UPDATE_EXISTING_INVENTORY !== 'false',
+
+    // Cache duration for location data in milliseconds (default: 1 hour)
+    locationCacheDuration: parseInt(process.env.LOCATION_CACHE_DURATION || '3600000', 10),
   },
 
   // Retry Configuration
@@ -114,6 +165,11 @@ export const config = {
 
     // Dry run mode (don't actually create products in Shopify)
     dryRun: process.env.DRY_RUN === 'true',
+
+    // Review mode: Process batch, log results, and exit for manual review
+    // When true, processes only batchSize products, logs summary, and exits
+    // When false, processes all products in full auto mode
+    reviewMode: process.env.REVIEW_MODE !== 'false', // default true for safety
   },
 };
 
@@ -123,7 +179,9 @@ export const config = {
 export function validateConfig() {
   const required = [
     { key: 'AIMSII_API_KEY', value: config.aimsii.apiKey },
-    { key: 'AIMSII_API_URL', value: config.aimsii.apiUrl },
+    { key: 'AIMSII_BASE_URL', value: config.aimsii.baseUrl },
+    { key: 'AIMSII_USERNAME', value: config.aimsii.username },
+    { key: 'AIMSII_PASSWORD', value: config.aimsii.password },
     { key: 'SHOPIFY_STORE', value: config.shopify.store },
     { key: 'SHOPIFY_ACCESS_TOKEN', value: config.shopify.accessToken },
   ];
@@ -142,6 +200,12 @@ export function validateConfig() {
   if (missing.length > 0) {
     const missingKeys = missing.map(({ key }) => key).join(', ');
     throw new Error(`Missing required environment variables: ${missingKeys}`);
+  }
+
+  // Validate that SKU field mapping is configured
+  // SKU is critical for duplicate detection
+  if (!config.fieldMapping['variants.sku']) {
+    throw new Error('SKU field mapping is required (AIMSII_FIELD_SKU). This field is used for duplicate detection.');
   }
 
   return true;
@@ -164,11 +228,14 @@ export function shouldSyncCategory(category) {
     return true;
   }
 
-  if (config.sync.allowedCategories.length === 0) {
+  // Focus categories override allowedCategories if specified
+  const categoriesToCheck = config.sync.focusCategories || config.sync.allowedCategories;
+
+  if (categoriesToCheck.length === 0) {
     return true; // No filter specified, sync all
   }
 
-  return config.sync.allowedCategories.some(
+  return categoriesToCheck.some(
     allowed => allowed.toLowerCase() === (category || '').toLowerCase()
   );
 }
